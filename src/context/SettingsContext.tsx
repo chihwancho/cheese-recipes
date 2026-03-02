@@ -7,28 +7,32 @@ import { useAuth } from './AuthContext';
 const defaultSettings: UserSettings = {
   llmProvider: 'anthropic',
   apiKey: '',
+  embeddingApiKey: '',
 };
 
 interface SettingsContextValue {
   settings: UserSettings;
   updateApiKey: (key: string) => void;
+  updateEmbeddingApiKey: (key: string) => void;
   updateLlmProvider: (provider: LlmProvider) => void;
   hasApiKey: boolean;
+  hasEmbeddingApiKey: boolean;
 }
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
 export function SettingsProvider({ children, userId }: { children: React.ReactNode; userId: string }) {
   const { sessionPassword } = useAuth();
-  const [settings, setSettings] = useState<UserSettings>(() =>
-    loadUserData<UserSettings>(userId, 'settings') ?? defaultSettings
-  );
+  const [settings, setSettings] = useState<UserSettings>(() => ({
+    ...defaultSettings,
+    ...loadUserData<UserSettings>(userId, 'settings'),
+  }));
   const isInitialMount = useRef(true);
   const isSyncingFromCloud = useRef(false);
 
   // Load from localStorage on userId change
   useEffect(() => {
-    setSettings(loadUserData<UserSettings>(userId, 'settings') ?? defaultSettings);
+    setSettings({ ...defaultSettings, ...loadUserData<UserSettings>(userId, 'settings') });
   }, [userId]);
 
   // Fetch from Supabase on mount / userId change
@@ -37,9 +41,10 @@ export function SettingsProvider({ children, userId }: { children: React.ReactNo
     if (!sessionPassword) return;
     fetchSettings(userId, sessionPassword).then((cloud) => {
       if (cloud !== null) {
+        const merged = { ...defaultSettings, ...cloud };
         isSyncingFromCloud.current = true;
-        setSettings(cloud);
-        saveUserData(userId, 'settings', cloud);
+        setSettings(merged);
+        saveUserData(userId, 'settings', merged);
       }
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -65,18 +70,25 @@ export function SettingsProvider({ children, userId }: { children: React.ReactNo
     setSettings((prev) => ({ ...prev, apiKey: key }));
   }, []);
 
+  const updateEmbeddingApiKey = useCallback((key: string) => {
+    setSettings((prev) => ({ ...prev, embeddingApiKey: key }));
+  }, []);
+
   const updateLlmProvider = useCallback((provider: LlmProvider) => {
     setSettings((prev) => ({ ...prev, llmProvider: provider }));
   }, []);
 
   const hasApiKey = settings.apiKey.trim().length > 0;
+  const hasEmbeddingApiKey = settings.embeddingApiKey.trim().length > 0;
 
   const value = useMemo(() => ({
     settings,
     updateApiKey,
+    updateEmbeddingApiKey,
     updateLlmProvider,
     hasApiKey,
-  }), [settings, updateApiKey, updateLlmProvider, hasApiKey]);
+    hasEmbeddingApiKey,
+  }), [settings, updateApiKey, updateEmbeddingApiKey, updateLlmProvider, hasApiKey, hasEmbeddingApiKey]);
 
   return (
     <SettingsContext.Provider value={value}>

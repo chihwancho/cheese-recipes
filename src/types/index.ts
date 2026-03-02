@@ -38,6 +38,7 @@ export type LlmProvider = 'anthropic' | 'openai';
 export interface UserSettings {
   llmProvider: LlmProvider;
   apiKey: string;
+  embeddingApiKey: string;
 }
 
 export type MealSlot = 'breakfast' | 'lunch' | 'dinner' | 'snack';

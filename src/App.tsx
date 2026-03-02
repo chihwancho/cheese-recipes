@@ -16,8 +16,14 @@ import WeeklyPlan from './components/tabs/WeeklyPlan';
 import Recipes from './components/tabs/Recipes';
 import ShoppingList from './components/tabs/ShoppingList';
 import Favorites from './components/tabs/Favorites';
+import { useEmbeddingSync } from './hooks/useEmbeddingSync';
 
 const authProvider = createSupabaseAuthProvider() ?? createLocalAuthProvider();
+
+function EmbeddingSyncRunner() {
+  useEmbeddingSync();
+  return null;
+}
 
 function AuthenticatedApp() {
   const { user, logout } = useAuth();
@@ -39,10 +45,11 @@ function AuthenticatedApp() {
   };
 
   return (
-    <RecipeProvider userId={user!.id}>
-      <ShoppingListProvider userId={user!.id}>
-        <MealPlanProvider userId={user!.id}>
-          <SettingsProvider userId={user!.id}>
+    <SettingsProvider userId={user!.id}>
+      <RecipeProvider userId={user!.id}>
+        <ShoppingListProvider userId={user!.id}>
+          <MealPlanProvider userId={user!.id}>
+            <EmbeddingSyncRunner />
             <div className="flex h-screen bg-gray-50">
               <Sidebar
                 activeTab={activeTab}
@@ -68,10 +75,10 @@ function AuthenticatedApp() {
               </div>
             </div>
             {showSettings && <SettingsModal onClose={() => setShowSettings(false)} />}
-          </SettingsProvider>
-        </MealPlanProvider>
-      </ShoppingListProvider>
-    </RecipeProvider>
+          </MealPlanProvider>
+        </ShoppingListProvider>
+      </RecipeProvider>
+    </SettingsProvider>
   );
 }
 
