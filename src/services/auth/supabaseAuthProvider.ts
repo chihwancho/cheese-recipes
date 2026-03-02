@@ -48,5 +48,12 @@ export function createSupabaseAuthProvider(): AuthProvider | null {
       if (!session?.user) return null;
       return mapUser(session.user);
     },
+
+    onAuthStateChange(callback: (user: AuthUser | null) => void): () => void {
+      const { data: { subscription } } = client.auth.onAuthStateChange((_event, session) => {
+        callback(session?.user ? mapUser(session.user) : null);
+      });
+      return () => subscription.unsubscribe();
+    },
   };
 }

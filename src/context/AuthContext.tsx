@@ -33,6 +33,19 @@ export function AuthProvider({ children, authProvider }: AuthProviderProps) {
       if (restored) setUser(restored);
       setIsLoading(false);
     });
+
+    // Listen for token refresh / sign-out events
+    if (!authProvider.onAuthStateChange) return;
+    const unsubscribe = authProvider.onAuthStateChange((updatedUser) => {
+      if (updatedUser) {
+        setUser(updatedUser);
+      } else {
+        // Session expired or was revoked
+        setUser(null);
+        setSessionPassword(null);
+      }
+    });
+    return unsubscribe;
   }, [authProvider]);
 
   const login = useCallback(async (email: string, password: string) => {

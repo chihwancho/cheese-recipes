@@ -20,4 +20,6 @@ export interface AuthProvider {
   logout(): Promise<void>;
   restoreSession(): Promise<AuthUser | null>;
   loginWithOAuth?(providerType: AuthProviderType): Promise<AuthResult>;
+  /** Subscribe to auth state changes (token refresh, sign-out). Returns unsubscribe fn. */
+  onAuthStateChange?(callback: (user: AuthUser | null) => void): () => void;
 }
