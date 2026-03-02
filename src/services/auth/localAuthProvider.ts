@@ -1,4 +1,4 @@
-import type { AuthProvider, AuthResult, AuthUser } from './types';
+import type { AuthProvider, AuthUser } from './types';
 
 interface StoredUser {
   id: string;

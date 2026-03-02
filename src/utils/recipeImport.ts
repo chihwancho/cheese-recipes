@@ -29,13 +29,22 @@ function decimalToFraction(num: number): string {
   return String(Math.round(num * 100) / 100);
 }
 
+function decodeHtmlEntities(text: string): string {
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = text;
+  return textarea.value;
+}
+
 function cleanIngredient(text: string): string {
+  // Decode HTML entities (&#39; → ', &amp; → &, etc.)
+  let cleaned = decodeHtmlEntities(text);
   // Replace decimal numbers with fraction equivalents
-  return text.replace(/(\d*\.\d+)/g, (match) => {
+  cleaned = cleaned.replace(/(\d*\.\d+)/g, (match) => {
     const num = parseFloat(match);
     if (isNaN(num)) return match;
     return decimalToFraction(num);
   });
+  return cleaned;
 }
 
 function parseIsoDuration(iso: string): string {
@@ -174,8 +183,8 @@ export async function parseRecipeFromUrl(url: string): Promise<Partial<Recipe>> 
   }
 
   return {
-    title: extractText(recipeData.name) || '',
-    description: extractText(recipeData.description) || '',
+    title: decodeHtmlEntities(extractText(recipeData.name) || ''),
+    description: decodeHtmlEntities(extractText(recipeData.description) || ''),
     prepTime: parseIsoDuration(extractText(recipeData.prepTime)),
     cookTime: parseIsoDuration(extractText(recipeData.cookTime) || extractText(recipeData.totalTime)),
     servings: extractServings(recipeData.recipeYield),
@@ -183,7 +192,7 @@ export async function parseRecipeFromUrl(url: string): Promise<Partial<Recipe>> 
       ? recipeData.recipeIngredient.map((i) => cleanIngredient(String(i)))
       : [],
     steps: extractSteps(recipeData.recipeInstructions).map(cleanIngredient),
-    tags: extractKeywords(recipeData.keywords || recipeData.recipeCategory || recipeData.recipeCuisine),
+    tags: extractKeywords(recipeData.keywords || recipeData.recipeCategory || recipeData.recipeCuisine).map(decodeHtmlEntities),
     images: extractImages(recipeData.image),
   };
 }
