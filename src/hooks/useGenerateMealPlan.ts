@@ -2,16 +2,26 @@ import { useState, useCallback } from 'react';
 import { useSettings } from '../context/SettingsContext';
 import { useRecipes } from '../context/RecipeContext';
 import { useMealPlan } from '../context/MealPlanContext';
+import { useAuth } from '../context/AuthContext';
 import { createAiProvider } from '../services/ai';
 import type { MealPlanConstraints } from '../services/ai/types';
 import type { Meal, MealSlot } from '../types';
+import {
+  buildQueryText,
+  generateQueryEmbedding,
+  searchSimilarRecipes,
+} from '../services/embeddings';
+
+const RAG_THRESHOLD = 50;
+const RAG_TOP_K = 30;
 
 let nextId = 9000;
 
 export function useGenerateMealPlan() {
-  const { settings, hasApiKey } = useSettings();
+  const { settings, hasApiKey, hasEmbeddingApiKey } = useSettings();
   const { recipes } = useRecipes();
   const { weekPlan, setWeekPlan } = useMealPlan();
+  const { user } = useAuth();
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -29,8 +39,33 @@ export function useGenerateMealPlan() {
     setError(null);
 
     try {
+      let recipesToSend = recipes;
+
+      // RAG path: retrieve relevant subset when collection is large
+      const useRag = recipes.length > RAG_THRESHOLD && hasEmbeddingApiKey && user;
+      if (useRag) {
+        const enabledSlots = Object.entries(constraints.slots)
+          .filter(([, v]) => v)
+          .map(([k]) => k);
+
+        const dayContext = weekPlan
+          .slice(0, constraints.days)
+          .map((d, i) => `Day ${i}: ${d.day}`)
+          .join(', ');
+
+        const queryText = buildQueryText(enabledSlots, constraints.dietaryNotes, dayContext);
+        const queryEmbedding = await generateQueryEmbedding(settings.embeddingApiKey, queryText);
+        const matchedIds = await searchSimilarRecipes(user.id, queryEmbedding, RAG_TOP_K);
+
+        if (matchedIds.length > 0) {
+          const matchedIdSet = new Set(matchedIds);
+          // Always include favorites as a boost
+          recipesToSend = recipes.filter((r) => matchedIdSet.has(r.id) || r.isFavorite);
+        }
+      }
+
       const provider = createAiProvider(settings.llmProvider, settings.apiKey);
-      const result = await provider.generateMealPlan(recipes, constraints, weekPlan);
+      const result = await provider.generateMealPlan(recipesToSend, constraints, weekPlan);
 
       setWeekPlan((prev) => {
         const next = prev.map((day) => ({
@@ -75,7 +110,7 @@ export function useGenerateMealPlan() {
     } finally {
       setIsGenerating(false);
     }
-  }, [hasApiKey, recipes, settings, weekPlan, setWeekPlan]);
+  }, [hasApiKey, hasEmbeddingApiKey, recipes, settings, weekPlan, setWeekPlan, user]);
 
   return { generate, isGenerating, error, clearError: () => setError(null) };
 }

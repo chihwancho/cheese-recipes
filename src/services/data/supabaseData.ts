@@ -50,6 +50,7 @@ interface UserSettingsRow {
   user_id: string;
   llm_provider: string;
   encrypted_api_key: string;
+  encrypted_embedding_api_key: string;
 }
 
 function rowToRecipe(row: RecipeRow): Recipe {
@@ -281,9 +282,14 @@ export async function fetchSettings(userId: string, password: string): Promise<U
   if (row.encrypted_api_key) {
     apiKey = (await decrypt(row.encrypted_api_key, password)) ?? '';
   }
+  let embeddingApiKey = '';
+  if (row.encrypted_embedding_api_key) {
+    embeddingApiKey = (await decrypt(row.encrypted_embedding_api_key, password)) ?? '';
+  }
   return {
     llmProvider: row.llm_provider as UserSettings['llmProvider'],
     apiKey,
+    embeddingApiKey,
   };
 }
 
@@ -292,6 +298,9 @@ export async function upsertSettings(userId: string, settings: UserSettings, pas
   const encryptedApiKey = settings.apiKey
     ? await encrypt(settings.apiKey, password)
     : '';
+  const encryptedEmbeddingApiKey = settings.embeddingApiKey
+    ? await encrypt(settings.embeddingApiKey, password)
+    : '';
   const { error } = await supabase
     .from('user_settings')
     .upsert(
@@ -299,6 +308,7 @@ export async function upsertSettings(userId: string, settings: UserSettings, pas
         user_id: userId,
         llm_provider: settings.llmProvider,
         encrypted_api_key: encryptedApiKey,
+        encrypted_embedding_api_key: encryptedEmbeddingApiKey,
       },
       { onConflict: 'user_id' }
     );

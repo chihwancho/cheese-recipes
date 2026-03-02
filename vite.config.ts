@@ -89,5 +89,52 @@ export default defineConfig({
         });
       },
     },
+    {
+      name: 'embeddings-proxy',
+      configureServer(server) {
+        server.middlewares.use('/api/ai/embeddings', async (req: IncomingMessage, res: ServerResponse) => {
+          if (req.method !== 'POST') {
+            res.statusCode = 405;
+            res.end(JSON.stringify({ error: 'Method not allowed' }));
+            return;
+          }
+
+          const chunks: Buffer[] = [];
+          for await (const chunk of req) {
+            chunks.push(chunk as Buffer);
+          }
+          const body = JSON.parse(Buffer.concat(chunks).toString());
+
+          const { apiKey, input, model } = body;
+          if (!apiKey) {
+            res.statusCode = 400;
+            res.end(JSON.stringify({ error: 'Missing apiKey' }));
+            return;
+          }
+
+          try {
+            const response = await fetch('https://api.openai.com/v1/embeddings', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`,
+              },
+              body: JSON.stringify({
+                model: model || 'text-embedding-3-small',
+                input,
+              }),
+            });
+
+            const data = await response.text();
+            res.statusCode = response.status;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(data);
+          } catch (err) {
+            res.statusCode = 502;
+            res.end(JSON.stringify({ error: String(err) }));
+          }
+        });
+      },
+    },
   ],
 })

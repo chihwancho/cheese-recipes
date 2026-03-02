@@ -13,10 +13,13 @@ const providers: { id: LlmProvider; label: string; placeholder: string }[] = [
 ];
 
 export default function SettingsModal({ onClose }: SettingsModalProps) {
-  const { settings, updateApiKey, updateLlmProvider } = useSettings();
+  const { settings, updateApiKey, updateEmbeddingApiKey, updateLlmProvider } = useSettings();
   const [keyInput, setKeyInput] = useState(settings.apiKey);
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [embKeyInput, setEmbKeyInput] = useState(settings.embeddingApiKey);
+  const [showEmbKey, setShowEmbKey] = useState(false);
+  const [embSaved, setEmbSaved] = useState(false);
 
   const selectedProvider = providers.find((p) => p.id === settings.llmProvider) ?? providers[0];
 
@@ -24,6 +27,12 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     updateApiKey(keyInput.trim());
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handleSaveEmbeddingKey = () => {
+    updateEmbeddingApiKey(embKeyInput.trim());
+    setEmbSaved(true);
+    setTimeout(() => setEmbSaved(false), 2000);
   };
 
   const handleProviderChange = (provider: LlmProvider) => {
@@ -116,6 +125,57 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               </span>
             ) : (
               'Save API Key'
+            )}
+          </button>
+
+          <div className="pt-4 border-t border-gray-100">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              <Key className="w-4 h-4 inline mr-1.5 -mt-0.5" />
+              Embedding API Key (OpenAI)
+            </label>
+            <div className="relative">
+              <input
+                type={showEmbKey ? 'text' : 'password'}
+                value={embKeyInput}
+                onChange={(e) => {
+                  setEmbKeyInput(e.target.value);
+                  setEmbSaved(false);
+                }}
+                placeholder="sk-..."
+                className="w-full px-3 py-2.5 pr-20 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400 font-mono"
+              />
+              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
+                <button
+                  onClick={() => setShowEmbKey(!showEmbKey)}
+                  className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors cursor-pointer"
+                  title={showEmbKey ? 'Hide key' : 'Show key'}
+                >
+                  {showEmbKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+            <p className="mt-1.5 text-xs text-gray-400">
+              Powers semantic recipe search for large collections. Uses OpenAI text-embedding-3-small.
+            </p>
+          </div>
+
+          <button
+            onClick={handleSaveEmbeddingKey}
+            disabled={embKeyInput.trim() === settings.embeddingApiKey}
+            className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+              embSaved
+                ? 'bg-green-500 text-white'
+                : embKeyInput.trim() === settings.embeddingApiKey
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-primary-600 text-white hover:bg-primary-700'
+            }`}
+          >
+            {embSaved ? (
+              <span className="flex items-center justify-center gap-1.5">
+                <Check className="w-4 h-4" /> Saved
+              </span>
+            ) : (
+              'Save Embedding Key'
             )}
           </button>
         </div>
