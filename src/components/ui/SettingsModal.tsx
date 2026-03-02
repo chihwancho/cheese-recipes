@@ -37,8 +37,6 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
 
   const handleProviderChange = (provider: LlmProvider) => {
     updateLlmProvider(provider);
-    setKeyInput('');
-    updateApiKey('');
   };
 
   return (
