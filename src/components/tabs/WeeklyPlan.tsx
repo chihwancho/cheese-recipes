@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
-import { CalendarDays, Plus, Copy, ArrowRightLeft, ChevronLeft, ChevronRight, RotateCcw, ShoppingCart, Sparkles } from 'lucide-react';
+import { CalendarDays, Plus, Copy, ArrowRightLeft, ChevronLeft, ChevronRight, RotateCcw, ShoppingCart, Sparkles, Leaf } from 'lucide-react';
 import { getMonday, formatDate, formatDateShort } from '../../data/sampleData';
 import { useMealPlan } from '../../context/MealPlanContext';
 import { useRecipes } from '../../context/RecipeContext';
@@ -8,6 +8,7 @@ import { mergeIngredients } from '../../utils/ingredientMerge';
 import MealCard from '../ui/MealCard';
 import AddMealPanel from '../ui/AddMealPanel';
 import GenerateMealPlanModal from '../ui/GenerateMealPlanModal';
+import NutritionReviewModal from '../ui/NutritionReviewModal';
 import type { DayPlan, Meal, MealSlot, Recipe } from '../../types';
 
 interface DragData {
@@ -37,6 +38,7 @@ export default function WeeklyPlan() {
   const [addMealTarget, setAddMealTarget] = useState<{ dayIndex: number; slot: MealSlot } | null>(null);
   const [showExportModal, setShowExportModal] = useState(false);
   const [showGenerateModal, setShowGenerateModal] = useState(false);
+  const [showNutritionReview, setShowNutritionReview] = useState(false);
 
   const isCurrentWeek = useMemo(() => {
     const today = getMonday(new Date());
@@ -262,6 +264,15 @@ export default function WeeklyPlan() {
             <span className="sm:hidden">Generate</span>
           </button>
           <button
+            onClick={() => setShowNutritionReview(true)}
+            disabled={totalMeals === 0}
+            className="flex items-center gap-2 px-3 sm:px-3.5 py-2 bg-green-500 text-white text-xs font-medium rounded-lg hover:bg-green-600 transition-colors cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <Leaf className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Nutrition Review</span>
+            <span className="sm:hidden">Nutrition</span>
+          </button>
+          <button
             onClick={() => setShowExportModal(true)}
             disabled={totalMeals === 0}
             className="flex items-center gap-2 px-3 sm:px-3.5 py-2 bg-accent-500 text-white text-xs font-medium rounded-lg hover:bg-accent-600 transition-colors cursor-pointer shadow-sm disabled:opacity-40 disabled:cursor-not-allowed"
@@ -407,6 +418,11 @@ export default function WeeklyPlan() {
       {/* Generate meal plan modal */}
       {showGenerateModal && (
         <GenerateMealPlanModal onClose={() => setShowGenerateModal(false)} />
+      )}
+
+      {/* Nutrition review modal */}
+      {showNutritionReview && (
+        <NutritionReviewModal onClose={() => setShowNutritionReview(false)} />
       )}
 
       {/* Export to shopping list modal */}
