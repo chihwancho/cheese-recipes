@@ -64,7 +64,7 @@ export function useGenerateMealPlan() {
         }
       }
 
-      const provider = createAiProvider(settings.llmProvider, settings.apiKey);
+      const provider = createAiProvider('anthropic', settings.apiKey);
       const result = await provider.generateMealPlan(recipesToSend, constraints, weekPlan);
 
       setWeekPlan((prev) => {
