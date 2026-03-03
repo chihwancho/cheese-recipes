@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useMemo } from 'react';
 import { CalendarDays, Plus, Copy, ArrowRightLeft, ChevronLeft, ChevronRight, RotateCcw, ShoppingCart, Sparkles } from 'lucide-react';
-import { getMonday, formatDateShort } from '../../data/sampleData';
+import { getMonday, formatDate, formatDateShort } from '../../data/sampleData';
 import { useMealPlan } from '../../context/MealPlanContext';
 import { useRecipes } from '../../context/RecipeContext';
 import { useShoppingList } from '../../context/ShoppingListContext';
@@ -40,7 +40,7 @@ export default function WeeklyPlan() {
 
   const isCurrentWeek = useMemo(() => {
     const today = getMonday(new Date());
-    return today.toISOString().split('T')[0] === currentMonday.toISOString().split('T')[0];
+    return formatDate(today) === formatDate(currentMonday);
   }, [currentMonday]);
 
   // Week navigation
@@ -306,7 +306,7 @@ export default function WeeklyPlan() {
         <div className="flex gap-3 lg:grid lg:grid-cols-7 lg:gap-4">
           {weekPlan.map((day, dayIndex) => {
             const { name, date } = dayLabel(day);
-            const isToday = day.date === new Date().toISOString().split('T')[0];
+            const isToday = day.date === formatDate(new Date());
 
             return (
               <div key={day.date} className="min-w-[160px] sm:min-w-[180px] lg:min-w-0 shrink-0 lg:shrink flex flex-col gap-2">

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { CalendarPlus, Check, ChevronLeft, ChevronRight, X } from 'lucide-react';
 import type { Recipe, MealSlot } from '../../types';
 import { useMealPlan } from '../../context/MealPlanContext';
-import { getMonday, formatDateShort } from '../../data/sampleData';
+import { getMonday, formatDate, formatDateShort } from '../../data/sampleData';
 
 const mealSlots: { key: MealSlot; label: string; color: string }[] = [
   { key: 'breakfast', label: 'Breakfast', color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -53,7 +53,7 @@ export default function AddToPlanModal({ recipe, onClose }: AddToPlanModalProps)
 
   const isCurrentWeek = () => {
     const today = getMonday(new Date());
-    return today.toISOString().split('T')[0] === currentMonday.toISOString().split('T')[0];
+    return formatDate(today) === formatDate(currentMonday);
   };
 
   const goToThisWeek = () => {
@@ -138,7 +138,7 @@ export default function AddToPlanModal({ recipe, onClose }: AddToPlanModalProps)
                 const date = new Date(day.date + 'T00:00:00');
                 const dayAbbr = day.day.slice(0, 3);
                 const dateNum = date.getDate();
-                const isToday = day.date === new Date().toISOString().split('T')[0];
+                const isToday = day.date === formatDate(new Date());
                 const isSelected = selectedDay === i;
 
                 return (
