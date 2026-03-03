@@ -1,27 +1,19 @@
 import { useState } from 'react';
-import { X, Key, Eye, EyeOff, Check } from 'lucide-react';
-import type { LlmProvider } from '../../types';
+import { X, Key, Eye, EyeOff, Check, Sparkles, Search } from 'lucide-react';
 import { useSettings } from '../../context/SettingsContext';
 
 interface SettingsModalProps {
   onClose: () => void;
 }
 
-const providers: { id: LlmProvider; label: string; placeholder: string }[] = [
-  { id: 'anthropic', label: 'Anthropic (Claude)', placeholder: 'sk-ant-...' },
-  { id: 'openai', label: 'OpenAI (GPT)', placeholder: 'sk-...' },
-];
-
 export default function SettingsModal({ onClose }: SettingsModalProps) {
-  const { settings, updateApiKey, updateEmbeddingApiKey, updateLlmProvider } = useSettings();
+  const { settings, updateApiKey, updateEmbeddingApiKey } = useSettings();
   const [keyInput, setKeyInput] = useState(settings.apiKey);
   const [showKey, setShowKey] = useState(false);
   const [saved, setSaved] = useState(false);
   const [embKeyInput, setEmbKeyInput] = useState(settings.embeddingApiKey);
   const [showEmbKey, setShowEmbKey] = useState(false);
   const [embSaved, setEmbSaved] = useState(false);
-
-  const selectedProvider = providers.find((p) => p.id === settings.llmProvider) ?? providers[0];
 
   const handleSave = () => {
     updateApiKey(keyInput.trim());
@@ -35,14 +27,10 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
     setTimeout(() => setEmbSaved(false), 2000);
   };
 
-  const handleProviderChange = (provider: LlmProvider) => {
-    updateLlmProvider(provider);
-  };
-
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={onClose}>
       <div
-        className="bg-white rounded-2xl shadow-2xl w-full max-w-md"
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-md max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
@@ -56,29 +44,15 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
         </div>
 
         <div className="p-6 space-y-6">
+          {/* Meal Plan Generation */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">AI Provider</label>
-            <div className="flex gap-2">
-              {providers.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => handleProviderChange(p.id)}
-                  className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors cursor-pointer ${
-                    settings.llmProvider === p.id
-                      ? 'bg-primary-50 border-primary-300 text-primary-700'
-                      : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {p.label}
-                </button>
-              ))}
+            <div className="flex items-center gap-2 mb-3">
+              <Sparkles className="w-4 h-4 text-primary-500" />
+              <h3 className="text-sm font-semibold text-gray-800">Meal Plan Generation</h3>
             </div>
-          </div>
-
-          <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Key className="w-4 h-4 inline mr-1.5 -mt-0.5" />
-              API Key
+              Anthropic API Key
             </label>
             <div className="relative">
               <input
@@ -88,7 +62,7 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
                   setKeyInput(e.target.value);
                   setSaved(false);
                 }}
-                placeholder={selectedProvider.placeholder}
+                placeholder="sk-ant-..."
                 className="w-full px-3 py-2.5 pr-20 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-400 font-mono"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
@@ -102,34 +76,39 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               </div>
             </div>
             <p className="mt-1.5 text-xs text-gray-400">
-              Your key is stored locally on this device only.
+              Used by Claude to generate your weekly meal plans.
             </p>
+            <button
+              onClick={handleSave}
+              disabled={keyInput.trim() === settings.apiKey}
+              className={`w-full mt-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                saved
+                  ? 'bg-green-500 text-white'
+                  : keyInput.trim() === settings.apiKey
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-primary-600 text-white hover:bg-primary-700'
+              }`}
+            >
+              {saved ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <Check className="w-4 h-4" /> Saved
+                </span>
+              ) : (
+                'Save API Key'
+              )}
+            </button>
           </div>
 
-          <button
-            onClick={handleSave}
-            disabled={keyInput.trim() === settings.apiKey}
-            className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-              saved
-                ? 'bg-green-500 text-white'
-                : keyInput.trim() === settings.apiKey
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-primary-600 text-white hover:bg-primary-700'
-            }`}
-          >
-            {saved ? (
-              <span className="flex items-center justify-center gap-1.5">
-                <Check className="w-4 h-4" /> Saved
-              </span>
-            ) : (
-              'Save API Key'
-            )}
-          </button>
-
+          {/* Recipe Search (Embeddings) */}
           <div className="pt-4 border-t border-gray-100">
+            <div className="flex items-center gap-2 mb-3">
+              <Search className="w-4 h-4 text-primary-500" />
+              <h3 className="text-sm font-semibold text-gray-800">Smart Recipe Search</h3>
+              <span className="text-xs text-gray-400 font-normal">Optional</span>
+            </div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
               <Key className="w-4 h-4 inline mr-1.5 -mt-0.5" />
-              Embedding API Key (OpenAI)
+              OpenAI API Key
             </label>
             <div className="relative">
               <input
@@ -153,29 +132,28 @@ export default function SettingsModal({ onClose }: SettingsModalProps) {
               </div>
             </div>
             <p className="mt-1.5 text-xs text-gray-400">
-              Powers semantic recipe search for large collections. Uses OpenAI text-embedding-3-small.
+              Enables semantic recipe search when you have 50+ recipes. Uses OpenAI embeddings to find the most relevant recipes for meal plan generation.
             </p>
+            <button
+              onClick={handleSaveEmbeddingKey}
+              disabled={embKeyInput.trim() === settings.embeddingApiKey}
+              className={`w-full mt-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                embSaved
+                  ? 'bg-green-500 text-white'
+                  : embKeyInput.trim() === settings.embeddingApiKey
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-primary-600 text-white hover:bg-primary-700'
+              }`}
+            >
+              {embSaved ? (
+                <span className="flex items-center justify-center gap-1.5">
+                  <Check className="w-4 h-4" /> Saved
+                </span>
+              ) : (
+                'Save Embedding Key'
+              )}
+            </button>
           </div>
-
-          <button
-            onClick={handleSaveEmbeddingKey}
-            disabled={embKeyInput.trim() === settings.embeddingApiKey}
-            className={`w-full py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
-              embSaved
-                ? 'bg-green-500 text-white'
-                : embKeyInput.trim() === settings.embeddingApiKey
-                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                  : 'bg-primary-600 text-white hover:bg-primary-700'
-            }`}
-          >
-            {embSaved ? (
-              <span className="flex items-center justify-center gap-1.5">
-                <Check className="w-4 h-4" /> Saved
-              </span>
-            ) : (
-              'Save Embedding Key'
-            )}
-          </button>
         </div>
       </div>
     </div>

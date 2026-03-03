@@ -144,20 +144,15 @@ function findRecipeInJsonLd(data: unknown): Record<string, unknown> | null {
 }
 
 async function fetchHtml(url: string): Promise<string> {
-  // Use Vite's dev server proxy (avoids CORS entirely)
   const proxyUrl = `/api/fetch-recipe?url=${encodeURIComponent(url)}`;
   const proxyResponse = await fetch(proxyUrl);
-  if (proxyResponse.ok) {
-    const data = await proxyResponse.json();
-    if (data.contents) return data.contents as string;
+  if (!proxyResponse.ok) {
+    const err = await proxyResponse.json().catch(() => ({}));
+    throw new Error(err?.error || 'Could not reach this URL. The site may be blocking requests — try again.');
   }
-
-  // Fallback: try direct fetch (works if target allows CORS)
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error('Could not reach this URL. Check the link and try again.');
-  }
-  return await response.text();
+  const data = await proxyResponse.json();
+  if (data.contents) return data.contents as string;
+  throw new Error('Empty response from the recipe site. Try again or use a different URL.');
 }
 
 export async function parseRecipeFromUrl(url: string): Promise<Partial<Recipe>> {
