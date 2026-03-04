@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from 'react';
-import { X, Plus, Trash2, GripVertical, Link, Loader2, AlertCircle, ImageOff } from 'lucide-react';
+import { X, Plus, Trash2, GripVertical, Link, Loader2, AlertCircle, ImageOff, FileText, Type } from 'lucide-react';
 import type { Recipe } from '../../types';
 import { useRecipes } from '../../context/RecipeContext';
+import { useSettings } from '../../context/SettingsContext';
 import { parseRecipeFromUrl } from '../../utils/recipeImport';
+import { parseRecipeFromText, parseRecipeFromImage, parseRecipeFromPdf, fileToBase64 } from '../../utils/recipeImportAI';
 import StarRating from './StarRating';
+
+type ImportMode = 'url' | 'file' | 'text';
 
 interface RecipeFormModalProps {
   recipe?: Recipe;
@@ -68,6 +72,7 @@ const labelClass = 'block text-xs font-semibold uppercase tracking-wider text-gr
 
 export default function RecipeFormModal({ recipe, onClose }: RecipeFormModalProps) {
   const { addRecipe, updateRecipe } = useRecipes();
+  const { settings } = useSettings();
   const overlayRef = useRef<HTMLDivElement>(null);
   const isEditing = !!recipe;
 
@@ -75,10 +80,15 @@ export default function RecipeFormModal({ recipe, onClose }: RecipeFormModalProp
   const [tagInput, setTagInput] = useState('');
   const [imageUrlInput, setImageUrlInput] = useState('');
 
-  // URL import state
+  // Import state
+  const [importMode, setImportMode] = useState<ImportMode>('url');
   const [importUrl, setImportUrl] = useState('');
+  const [importText, setImportText] = useState('');
+  const [importFile, setImportFile] = useState<File | null>(null);
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState('');
+  const dropZoneRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handleEsc = (e: KeyboardEvent) => {
@@ -156,29 +166,73 @@ export default function RecipeFormModal({ recipe, onClose }: RecipeFormModalProp
     update('images', form.images.filter((_, i) => i !== index));
   };
 
-  // --- URL Import ---
-  const handleImport = async () => {
+  // --- Apply parsed recipe to form ---
+  const applyParsed = (parsed: Partial<Recipe>, sourceUrl?: string) => {
+    setForm((prev) => ({
+      ...prev,
+      title: parsed.title || prev.title,
+      description: parsed.description || prev.description,
+      prepTime: parsed.prepTime || prev.prepTime,
+      cookTime: parsed.cookTime || prev.cookTime,
+      servings: parsed.servings || prev.servings,
+      ingredients: parsed.ingredients && parsed.ingredients.length > 0 ? parsed.ingredients : prev.ingredients,
+      steps: parsed.steps && parsed.steps.length > 0 ? parsed.steps : prev.steps,
+      tags: parsed.tags && parsed.tags.length > 0 ? parsed.tags : prev.tags,
+      images: parsed.images && parsed.images.length > 0 ? parsed.images : prev.images,
+      source: sourceUrl ?? prev.source,
+    }));
+  };
+
+  // --- Import handlers ---
+  const handleUrlImport = async () => {
     if (!importUrl.trim()) return;
     setImporting(true);
     setImportError('');
     try {
       const url = importUrl.trim();
       const parsed = await parseRecipeFromUrl(url);
-      setForm((prev) => ({
-        ...prev,
-        title: parsed.title || prev.title,
-        description: parsed.description || prev.description,
-        prepTime: parsed.prepTime || prev.prepTime,
-        cookTime: parsed.cookTime || prev.cookTime,
-        servings: parsed.servings || prev.servings,
-        ingredients: parsed.ingredients && parsed.ingredients.length > 0 ? parsed.ingredients : prev.ingredients,
-        steps: parsed.steps && parsed.steps.length > 0 ? parsed.steps : prev.steps,
-        tags: parsed.tags && parsed.tags.length > 0 ? parsed.tags : prev.tags,
-        images: parsed.images && parsed.images.length > 0 ? parsed.images : prev.images,
-        source: url,
-      }));
+      applyParsed(parsed, url);
     } catch (err) {
       setImportError(err instanceof Error ? err.message : 'Failed to import recipe.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleFileImport = async () => {
+    if (!importFile) return;
+    if (!settings.apiKey) {
+      setImportError('An API key is required for file import. Add it in Settings.');
+      return;
+    }
+    setImporting(true);
+    setImportError('');
+    try {
+      const base64 = await fileToBase64(importFile);
+      const parsed = importFile.type === 'application/pdf'
+        ? await parseRecipeFromPdf(base64, settings.apiKey)
+        : await parseRecipeFromImage(base64, importFile.type, settings.apiKey);
+      applyParsed(parsed);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Failed to extract recipe from file.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleTextImport = async () => {
+    if (!importText.trim()) return;
+    if (!settings.apiKey) {
+      setImportError('An API key is required for text import. Add it in Settings.');
+      return;
+    }
+    setImporting(true);
+    setImportError('');
+    try {
+      const parsed = await parseRecipeFromText(importText.trim(), settings.apiKey);
+      applyParsed(parsed);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Failed to extract recipe from text.');
     } finally {
       setImporting(false);
     }
@@ -231,37 +285,121 @@ export default function RecipeFormModal({ recipe, onClose }: RecipeFormModalProp
 
         {/* Scrollable form */}
         <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          {/* URL Import (create mode only) */}
+          {/* Import section (create mode only) */}
           {!isEditing && (
-            <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-              <label className="block text-xs font-semibold uppercase tracking-wider text-blue-500 mb-2">
-                <Link className="w-3.5 h-3.5 inline mr-1.5 -mt-0.5" />
-                Import from URL
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="url"
-                  placeholder="https://www.example.com/recipe/..."
-                  value={importUrl}
-                  onChange={(e) => setImportUrl(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleImport()}
-                  className="flex-1 rounded-lg border border-blue-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-300 bg-white"
-                />
-                <button
-                  onClick={handleImport}
-                  disabled={importing || !importUrl.trim()}
-                  className="px-4 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
-                >
-                  {importing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      Importing...
-                    </>
-                  ) : (
-                    'Import'
-                  )}
-                </button>
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+              {/* Mode tabs */}
+              <div className="flex gap-1 mb-3">
+                {([
+                  { mode: 'url' as ImportMode, icon: Link, label: 'URL' },
+                  { mode: 'file' as ImportMode, icon: FileText, label: 'File' },
+                  { mode: 'text' as ImportMode, icon: Type, label: 'Text' },
+                ] as const).map(({ mode, icon: Icon, label }) => (
+                  <button
+                    key={mode}
+                    onClick={() => { setImportMode(mode); setImportError(''); }}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                      importMode === mode
+                        ? 'bg-blue-500 text-white'
+                        : 'text-blue-500 hover:bg-blue-100'
+                    }`}
+                  >
+                    <Icon className="w-3.5 h-3.5" />
+                    {label}
+                  </button>
+                ))}
               </div>
+
+              {/* URL mode */}
+              {importMode === 'url' && (
+                <div className="flex gap-2">
+                  <input
+                    type="url"
+                    placeholder="https://www.example.com/recipe/..."
+                    value={importUrl}
+                    onChange={(e) => setImportUrl(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleUrlImport()}
+                    className="flex-1 rounded-lg border border-blue-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white"
+                  />
+                  <button
+                    onClick={handleUrlImport}
+                    disabled={importing || !importUrl.trim()}
+                    className="px-4 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5"
+                  >
+                    {importing ? <><Loader2 className="w-4 h-4 animate-spin" />Importing...</> : 'Import'}
+                  </button>
+                </div>
+              )}
+
+              {/* File mode */}
+              {importMode === 'file' && (
+                <div className="space-y-2">
+                  <div className="relative flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-blue-200 rounded-lg hover:border-blue-400 hover:bg-blue-100/50 focus-within:border-blue-400 transition-colors">
+                    <textarea
+                      ref={dropZoneRef}
+                      className="absolute inset-0 opacity-0 cursor-pointer resize-none rounded-lg w-full h-full focus:outline-none"
+                      onMouseEnter={() => dropZoneRef.current?.focus()}
+                      onClick={() => fileInputRef.current?.click()}
+                      onPaste={(e) => {
+                        const item = Array.from(e.clipboardData.items).find((i) => i.type.startsWith('image/'));
+                        if (item) {
+                          const file = item.getAsFile();
+                          if (file) { setImportFile(file); setImportError(''); }
+                          e.preventDefault();
+                        }
+                      }}
+                      readOnly
+                    />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,.pdf"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] ?? null;
+                        setImportFile(file);
+                        setImportError('');
+                      }}
+                    />
+                    {importFile ? (
+                      <span className="text-sm font-medium text-blue-700 pointer-events-none">{importFile.name}</span>
+                    ) : (
+                      <>
+                        <FileText className="w-6 h-6 text-blue-300 mb-1 pointer-events-none" />
+                        <span className="text-xs text-blue-400 pointer-events-none">Click to select, or paste a screenshot</span>
+                      </>
+                    )}
+                  </div>
+                  <button
+                    onClick={handleFileImport}
+                    disabled={importing || !importFile}
+                    className="w-full px-4 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  >
+                    {importing ? <><Loader2 className="w-4 h-4 animate-spin" />Extracting...</> : 'Extract Recipe'}
+                  </button>
+                </div>
+              )}
+
+              {/* Text mode */}
+              {importMode === 'text' && (
+                <div className="space-y-2">
+                  <textarea
+                    value={importText}
+                    onChange={(e) => setImportText(e.target.value)}
+                    placeholder="Paste recipe text here — ingredients, steps, anything..."
+                    rows={5}
+                    className="w-full rounded-lg border border-blue-200 px-3 py-2 text-sm text-gray-800 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-300 bg-white resize-none"
+                  />
+                  <button
+                    onClick={handleTextImport}
+                    disabled={importing || !importText.trim()}
+                    className="w-full px-4 py-2 text-sm font-medium bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5"
+                  >
+                    {importing ? <><Loader2 className="w-4 h-4 animate-spin" />Extracting...</> : 'Extract Recipe'}
+                  </button>
+                </div>
+              )}
+
               {importError && (
                 <div className="mt-2 flex items-start gap-2 text-xs text-red-600">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />

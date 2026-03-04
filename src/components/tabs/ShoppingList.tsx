@@ -1,4 +1,4 @@
-import { ShoppingCart, Check, Trash2 } from 'lucide-react';
+import { ShoppingCart, Check, Trash2, Sparkles } from 'lucide-react';
 import { useShoppingList } from '../../context/ShoppingListContext';
 import type { ShoppingItem } from '../../types';
 
@@ -14,7 +14,7 @@ const categoryLabels: Record<ShoppingItem['category'], string> = {
 const categoryOrder: ShoppingItem['category'][] = ['produce', 'meat', 'dairy', 'pantry', 'bakery', 'frozen'];
 
 export default function ShoppingList() {
-  const { items, toggleItem, clearChecked } = useShoppingList();
+  const { items, isMerging, toggleItem, clearChecked } = useShoppingList();
 
   const checkedCount = items.filter((i) => i.checked).length;
 
@@ -48,6 +48,13 @@ export default function ShoppingList() {
           </button>
         )}
       </div>
+
+      {isMerging && (
+        <div className="max-w-2xl mb-4 flex items-center gap-2.5 px-4 py-3 bg-primary-50 border border-primary-100 rounded-xl text-sm text-primary-700">
+          <Sparkles className="w-4 h-4 animate-pulse shrink-0" />
+          <span>Combining similar ingredients...</span>
+        </div>
+      )}
 
       <div className="max-w-2xl space-y-6">
         {grouped.map((group) => (

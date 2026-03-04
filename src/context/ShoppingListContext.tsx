@@ -11,11 +11,13 @@ import {
 
 interface ShoppingListContextValue {
   items: ShoppingItem[];
+  isMerging: boolean;
   toggleItem: (id: string) => void;
   addItems: (newItems: ShoppingItem[]) => void;
   replaceItems: (newItems: ShoppingItem[]) => void;
   removeItem: (id: string) => void;
   clearChecked: () => void;
+  setMerging: (v: boolean) => void;
 }
 
 const ShoppingListContext = createContext<ShoppingListContextValue | null>(null);
@@ -24,6 +26,7 @@ export function ShoppingListProvider({ children, userId }: { children: React.Rea
   const [items, setItems] = useState<ShoppingItem[]>(() =>
     loadUserData<ShoppingItem[]>(userId, 'shoppingList') ?? []
   );
+  const [isMerging, setMerging] = useState(false);
 
   // Load from localStorage on userId change
   useEffect(() => {
@@ -88,12 +91,14 @@ export function ShoppingListProvider({ children, userId }: { children: React.Rea
 
   const value = useMemo(() => ({
     items,
+    isMerging,
     toggleItem,
     addItems,
     replaceItems,
     removeItem,
     clearChecked,
-  }), [items, toggleItem, addItems, replaceItems, removeItem, clearChecked]);
+    setMerging,
+  }), [items, isMerging, toggleItem, addItems, replaceItems, removeItem, clearChecked]);
 
   return (
     <ShoppingListContext.Provider value={value}>

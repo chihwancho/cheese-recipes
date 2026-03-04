@@ -4,7 +4,8 @@ import { getMonday, formatDate, formatDateShort } from '../../data/sampleData';
 import { useMealPlan } from '../../context/MealPlanContext';
 import { useRecipes } from '../../context/RecipeContext';
 import { useShoppingList } from '../../context/ShoppingListContext';
-import { mergeIngredients } from '../../utils/ingredientMerge';
+import { useSettings } from '../../context/SettingsContext';
+import { mergeIngredients, mergeIngredientsWithAI } from '../../utils/ingredientMerge';
 import MealCard from '../ui/MealCard';
 import AddMealPanel from '../ui/AddMealPanel';
 import GenerateMealPlanModal from '../ui/GenerateMealPlanModal';
@@ -30,7 +31,8 @@ let nextId = 100;
 export default function WeeklyPlan() {
   const { currentMonday, setCurrentMonday, weekPlan, setWeekPlan } = useMealPlan();
   const { recipes } = useRecipes();
-  const { addItems, replaceItems } = useShoppingList();
+  const { addItems, replaceItems, setMerging } = useShoppingList();
+  const { settings } = useSettings();
 
   const [dropTarget, setDropTarget] = useState<{ dayIndex: number; slot: MealSlot } | null>(null);
   const [isCopy, setIsCopy] = useState(false);
@@ -204,8 +206,8 @@ export default function WeeklyPlan() {
       sum + slots.reduce((s, slot) => s + day[slot].length, 0), 0);
   }, [weekPlan]);
 
-  // Collect all ingredients from planned meals
-  const collectIngredients = useCallback(() => {
+  // Collect all ingredient lists from planned meals
+  const getIngredientLists = useCallback(() => {
     const slots: MealSlot[] = ['breakfast', 'lunch', 'dinner', 'snack'];
     const ingredientLists: string[][] = [];
 
@@ -220,17 +222,32 @@ export default function WeeklyPlan() {
       }
     }
 
-    return mergeIngredients(ingredientLists);
+    return ingredientLists;
   }, [weekPlan, recipes]);
 
   const handleExport = (mode: 'add' | 'replace') => {
-    const items = collectIngredients();
+    const ingredientLists = getIngredientLists();
+
+    // Instant library-based merge
+    const items = mergeIngredients(ingredientLists);
     if (mode === 'replace') {
       replaceItems(items);
     } else {
       addItems(items);
     }
     setShowExportModal(false);
+
+    // Kick off AI merge in background if API key is available
+    if (settings.apiKey) {
+      setMerging(true);
+      mergeIngredientsWithAI(ingredientLists, settings.apiKey)
+        .then((aiItems) => {
+          replaceItems(aiItems);
+        })
+        .finally(() => {
+          setMerging(false);
+        });
+    }
   };
 
   return (

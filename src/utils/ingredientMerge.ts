@@ -1,69 +1,46 @@
+import { parseIngredient } from 'parse-ingredient';
 import type { ShoppingItem } from '../types';
 
-// Common fraction patterns
-const FRACTION_REGEX = /(\d+)\s*\/\s*(\d+)/;
-const MIXED_REGEX = /(\d+)\s+(\d+)\s*\/\s*(\d+)/;
-const DECIMAL_REGEX = /^\d+\.?\d*/;
+type Category = ShoppingItem['category'];
 
-// Units that can be merged (normalized forms)
-const UNIT_ALIASES: Record<string, string> = {
-  cup: 'cup', cups: 'cup',
-  tablespoon: 'tbsp', tablespoons: 'tbsp', tbsp: 'tbsp', tbs: 'tbsp',
-  teaspoon: 'tsp', teaspoons: 'tsp', tsp: 'tsp',
-  pound: 'lb', pounds: 'lb', lb: 'lb', lbs: 'lb',
-  ounce: 'oz', ounces: 'oz', oz: 'oz',
-  can: 'can', cans: 'can',
-  clove: 'clove', cloves: 'clove',
-  bunch: 'bunch', bunches: 'bunch',
-  head: 'head', heads: 'head',
-  piece: 'piece', pieces: 'piece',
-  slice: 'slice', slices: 'slice',
-  bottle: 'bottle', bottles: 'bottle',
-  box: 'box', boxes: 'box',
-  bag: 'bag', bags: 'bag',
-  jar: 'jar', jars: 'jar',
-  dozen: 'dozen',
-  pinch: 'pinch',
-  dash: 'dash',
-  quart: 'quart', quarts: 'quart', qt: 'quart',
-  pint: 'pint', pints: 'pint', pt: 'pint',
-  gallon: 'gallon', gallons: 'gallon', gal: 'gallon',
-  liter: 'liter', liters: 'liter', l: 'liter',
-  ml: 'ml', milliliter: 'ml', milliliters: 'ml',
-  g: 'g', gram: 'g', grams: 'g',
-  kg: 'kg', kilogram: 'kg', kilograms: 'kg',
-};
+const CATEGORY_ORDER: Category[] = ['produce', 'meat', 'dairy', 'bakery', 'frozen', 'pantry'];
 
-// Category guessing based on ingredient name
-const CATEGORY_KEYWORDS: Record<ShoppingItem['category'], string[]> = {
+// Category guessing based on ingredient name (fallback when AI is not used)
+const CATEGORY_KEYWORDS: Record<Category, string[]> = {
   produce: ['lettuce', 'tomato', 'onion', 'garlic', 'pepper', 'potato', 'carrot', 'celery', 'cucumber', 'avocado', 'lemon', 'lime', 'orange', 'apple', 'banana', 'berry', 'berries', 'basil', 'cilantro', 'parsley', 'mint', 'ginger', 'kale', 'spinach', 'broccoli', 'mushroom', 'corn', 'bean sprout', 'scallion', 'green onion', 'sweet potato', 'squash', 'zucchini', 'asparagus', 'cabbage', 'pea', 'fruit', 'vegetable', 'herb', 'fresh'],
-  meat: ['chicken', 'beef', 'pork', 'turkey', 'lamb', 'steak', 'ground', 'bacon', 'sausage', 'ham', 'salmon', 'fish', 'shrimp', 'tuna', 'cod', 'tilapia', 'crab', 'lobster', 'seafood', 'meat', 'fillet', 'breast', 'thigh', 'wing', 'pepperoni', 'anchovy'],
+  meat: ['chicken', 'beef', 'pork', 'turkey', 'lamb', 'steak', 'ground beef', 'ground turkey', 'ground pork', 'ground chicken', 'ground lamb', 'ground meat', 'bacon', 'sausage', 'ham', 'salmon', 'fish', 'shrimp', 'tuna', 'cod', 'tilapia', 'crab', 'lobster', 'seafood', 'meat', 'fillet', 'breast', 'thigh', 'wing', 'pepperoni', 'anchovy'],
   dairy: ['milk', 'cheese', 'butter', 'cream', 'yogurt', 'egg', 'eggs', 'sour cream', 'mozzarella', 'parmesan', 'cheddar', 'ricotta', 'whipping cream', 'half and half', 'cottage cheese'],
   bakery: ['bread', 'roll', 'bun', 'tortilla', 'pita', 'naan', 'croissant', 'bagel', 'baguette', 'sourdough', 'pizza dough', 'dough', 'crust'],
   frozen: ['frozen', 'ice cream'],
   pantry: ['oil', 'vinegar', 'sauce', 'paste', 'flour', 'sugar', 'salt', 'pepper', 'spice', 'seasoning', 'rice', 'pasta', 'spaghetti', 'noodle', 'can', 'broth', 'stock', 'honey', 'syrup', 'mustard', 'ketchup', 'mayo', 'soy sauce', 'coconut', 'quinoa', 'oat', 'cereal', 'crouton', 'breadcrumb', 'baking', 'vanilla', 'cinnamon', 'cumin', 'paprika', 'oregano', 'thyme', 'rosemary', 'curry', 'chili', 'sriracha', 'tahini', 'peanut butter', 'almond butter', 'jam', 'jelly', 'nut', 'seed', 'chickpea', 'lentil', 'bean', 'canned', 'dried', 'powder'],
 };
 
-interface ParsedIngredient {
-  quantity: number;
-  unit: string;
-  name: string;
+function guessCategory(name: string): Category {
+  const lower = name.toLowerCase();
+  let bestMatch: { category: Category; length: number } | null = null;
+
+  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS) as [Category, string[]][]) {
+    for (const keyword of keywords) {
+      if (lower.includes(keyword)) {
+        if (!bestMatch || keyword.length > bestMatch.length) {
+          bestMatch = { category, length: keyword.length };
+        }
+      }
+    }
+  }
+
+  return bestMatch?.category ?? 'pantry';
 }
 
-function parseFraction(str: string): number {
-  const mixed = str.match(MIXED_REGEX);
-  if (mixed) {
-    return parseInt(mixed[1]) + parseInt(mixed[2]) / parseInt(mixed[3]);
-  }
-  const frac = str.match(FRACTION_REGEX);
-  if (frac) {
-    return parseInt(frac[1]) / parseInt(frac[2]);
-  }
-  const dec = str.match(DECIMAL_REGEX);
-  if (dec) {
-    return parseFloat(dec[0]);
-  }
-  return 0;
+function cleanRawText(raw: string): string {
+  let text = raw.trim();
+  // Strip leading bullets, asterisks, dashes, periods, list markers
+  text = text.replace(/^[\s*•·.▪–—-]+/, '').trim();
+  // Strip trailing asterisks, footnote markers, or other markup
+  text = text.replace(/[*†‡]+$/, '').trim();
+  // Strip trailing price annotations like ($3 7/8)
+  text = text.replace(/\s*\(\$[\d\s./]+\)\s*$/, '').trim();
+  return text;
 }
 
 function formatQuantity(num: number): string {
@@ -87,99 +64,178 @@ function formatQuantity(num: number): string {
   return String(Math.round(num * 100) / 100);
 }
 
-function parseIngredient(raw: string): ParsedIngredient {
-  let text = raw.trim();
-
-  // Extract leading quantity
-  let quantity = 0;
-  const mixedMatch = text.match(/^(\d+\s+\d+\s*\/\s*\d+)/);
-  const fracMatch = text.match(/^(\d+\s*\/\s*\d+)/);
-  const decMatch = text.match(/^(\d+\.?\d*)/);
-
-  if (mixedMatch) {
-    quantity = parseFraction(mixedMatch[1]);
-    text = text.slice(mixedMatch[0].length).trim();
-  } else if (fracMatch) {
-    quantity = parseFraction(fracMatch[1]);
-    text = text.slice(fracMatch[0].length).trim();
-  } else if (decMatch) {
-    quantity = parseFloat(decMatch[1]);
-    text = text.slice(decMatch[0].length).trim();
-  }
-
-  // Extract unit
-  let unit = '';
-  const unitMatch = text.match(/^([a-zA-Z]+\.?)\b/);
-  if (unitMatch) {
-    const candidate = unitMatch[1].replace('.', '').toLowerCase();
-    if (UNIT_ALIASES[candidate]) {
-      unit = UNIT_ALIASES[candidate];
-      text = text.slice(unitMatch[0].length).trim();
-      // Skip "of" after unit
-      if (text.toLowerCase().startsWith('of ')) {
-        text = text.slice(3).trim();
-      }
-    }
-  }
-
-  // Rest is the name — strip leading commas/spaces and trailing prep instructions
-  let name = text.replace(/^[,\s]+/, '');
-  // Remove parenthetical prep notes like "(diced)" or trailing ", diced"
-  name = name.replace(/\s*\(.*?\)\s*/g, ' ').trim();
-
-  return { quantity, unit, name };
+function normalizeDescription(desc: string): string {
+  return desc
+    .toLowerCase()
+    .replace(/\s*\(.*?\)\s*/g, ' ')  // remove parentheticals
+    .replace(/[,;].*$/, '')           // strip after commas/semicolons
+    .replace(/[*†‡]+$/, '')           // footnote markers
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-function guessCategory(name: string): ShoppingItem['category'] {
-  const lower = name.toLowerCase();
-  for (const [category, keywords] of Object.entries(CATEGORY_KEYWORDS) as [ShoppingItem['category'], string[]][]) {
-    for (const keyword of keywords) {
-      if (lower.includes(keyword)) return category;
-    }
-  }
-  return 'pantry';
+function sortItems(items: ShoppingItem[]): ShoppingItem[] {
+  return items.sort((a, b) => {
+    const catDiff = CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category);
+    if (catDiff !== 0) return catDiff;
+    return a.name.localeCompare(b.name, undefined, { sensitivity: 'base' });
+  });
 }
 
-function normalizeItemName(name: string): string {
-  return name.toLowerCase().replace(/[,;].*$/, '').replace(/\s+/g, ' ').trim();
-}
-
+/**
+ * Library-based ingredient merge (synchronous, no API needed).
+ * Uses parse-ingredient for parsing, then merges by normalized name.
+ */
 export function mergeIngredients(ingredientLists: string[][]): ShoppingItem[] {
-  const merged = new Map<string, { quantity: number; unit: string; rawName: string }>();
+  const allRaw = ingredientLists.flat().map(cleanRawText).filter(Boolean);
+  const parsed = parseIngredient(allRaw.join('\n'), { normalizeUOM: true });
 
-  for (const list of ingredientLists) {
-    for (const raw of list) {
-      const parsed = parseIngredient(raw);
-      const key = `${normalizeItemName(parsed.name)}|${parsed.unit}`;
+  // Group by normalized description, then by unit
+  const byName = new Map<string, { parts: { quantity: number; unit: string }[]; rawName: string }>();
 
-      const existing = merged.get(key);
-      if (existing) {
-        existing.quantity += parsed.quantity;
+  for (const item of parsed) {
+    if (item.isGroupHeader) continue;
+
+    const desc = item.description;
+    const qty = item.quantity2 ?? item.quantity ?? 0; // use upper range if present
+    const unit = item.unitOfMeasureID ?? '';
+    const key = normalizeDescription(desc);
+
+    const existing = byName.get(key);
+    if (existing) {
+      const samePart = existing.parts.find((p) => p.unit === unit);
+      if (samePart) {
+        samePart.quantity += qty;
       } else {
-        merged.set(key, {
-          quantity: parsed.quantity,
-          unit: parsed.unit,
-          rawName: parsed.name,
-        });
+        existing.parts.push({ quantity: qty, unit });
       }
+    } else {
+      byName.set(key, { parts: [{ quantity: qty, unit }], rawName: desc });
     }
   }
 
   const items: ShoppingItem[] = [];
 
-  for (const { quantity, unit, rawName } of merged.values()) {
-    const qtyStr = formatQuantity(quantity);
-    const unitStr = unit ? ` ${unit}` : '';
-    const quantityLabel = qtyStr ? `${qtyStr}${unitStr}` : '';
+  for (const { parts, rawName } of byName.values()) {
+    const labels = parts
+      .map(({ quantity, unit }) => {
+        const qtyStr = formatQuantity(quantity);
+        const unitStr = unit ? ` ${unit}` : '';
+        return qtyStr ? `${qtyStr}${unitStr}` : '';
+      })
+      .filter(Boolean);
 
     items.push({
       id: crypto.randomUUID(),
       name: rawName,
-      quantity: quantityLabel,
+      quantity: labels.join(' + '),
       category: guessCategory(rawName),
       checked: false,
     });
   }
 
-  return items;
+  return sortItems(items);
+}
+
+interface AiMergedItem {
+  name: string;
+  quantity: string;
+  category: Category;
+}
+
+/**
+ * AI-enhanced ingredient merge. Uses parse-ingredient for initial parsing,
+ * then sends the pre-parsed list to Claude Haiku for smart normalization,
+ * merging of similar items, and accurate categorization.
+ */
+export async function mergeIngredientsWithAI(
+  ingredientLists: string[][],
+  apiKey: string,
+): Promise<ShoppingItem[]> {
+  // Step 1: Parse with library
+  const allRaw = ingredientLists.flat().map(cleanRawText).filter(Boolean);
+  const parsed = parseIngredient(allRaw.join('\n'), { normalizeUOM: true });
+
+  // Build structured data for the AI
+  const ingredientData = parsed
+    .filter((item) => !item.isGroupHeader)
+    .map((item) => ({
+      qty: item.quantity2 ?? item.quantity ?? 0,
+      unit: item.unitOfMeasureID ?? '',
+      name: item.description,
+    }));
+
+  if (ingredientData.length === 0) return [];
+
+  // Step 2: Ask AI to normalize, merge, and categorize
+  const prompt = `You are a shopping list assistant. Below is a JSON array of recipe ingredients parsed from multiple recipes.
+
+## Parsed Ingredients
+${JSON.stringify(ingredientData)}
+
+## Your Job
+1. Merge duplicates: Combine items that are the same ingredient. Be smart — "large eggs" and "eggs" are the same; "Greek yogurt" and "plain yogurt" are different; "salt and pepper", "salt and freshly ground pepper", "salt" should all merge into one "salt and pepper" entry.
+2. Add up quantities when units match. If units differ for the same item, show both (e.g., "1 cup + 2 tbsp").
+3. Clean up names: Remove prep instructions (diced, minced, chopped), footnote markers (*, **), price annotations ($3). Keep names clean and readable.
+4. Categorize each item into exactly one of: produce, meat, dairy, bakery, frozen, pantry.
+
+## Response Format
+Respond with ONLY a JSON array (no markdown fences, no extra text):
+[{"name":"butter","quantity":"3 tbsp","category":"dairy"}]
+
+Rules for the quantity field:
+- Use simple formats: "2 cups", "1/2 lb", "3", "1 cup + 2 tbsp"
+- Use fractions not decimals: "1/2" not "0.5"
+- If no quantity, use ""
+- NEVER put the ingredient name or notes in the quantity field`;
+
+  const response = await fetch('/api/ai/anthropic', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      apiKey,
+      model: 'claude-haiku-4-5-20251001',
+      maxTokens: 2048,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  if (!response.ok) {
+    // Fall back to library-only merge on API failure
+    console.warn('AI merge failed, falling back to library merge');
+    return mergeIngredients(ingredientLists);
+  }
+
+  const data = await response.json();
+  const text = data.content?.[0]?.text;
+
+  if (!text) {
+    return mergeIngredients(ingredientLists);
+  }
+
+  try {
+    let jsonStr = text.trim();
+    const fenceMatch = jsonStr.match(/```(?:json)?\s*([\s\S]*?)```/);
+    if (fenceMatch) jsonStr = fenceMatch[1].trim();
+
+    const aiItems: AiMergedItem[] = JSON.parse(jsonStr);
+
+    if (!Array.isArray(aiItems)) {
+      return mergeIngredients(ingredientLists);
+    }
+
+    const validCategories = new Set(CATEGORY_ORDER);
+    const items: ShoppingItem[] = aiItems.map((item) => ({
+      id: crypto.randomUUID(),
+      name: item.name,
+      quantity: item.quantity || '',
+      category: validCategories.has(item.category as Category) ? (item.category as Category) : guessCategory(item.name),
+      checked: false,
+    }));
+
+    return sortItems(items);
+  } catch {
+    // JSON parse failed — fall back to library-only merge
+    return mergeIngredients(ingredientLists);
+  }
 }
