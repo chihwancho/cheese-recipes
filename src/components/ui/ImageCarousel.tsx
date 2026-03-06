@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ChevronLeft, ChevronRight, ImageOff } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 
 interface ImageCarouselProps {
   images: string[];
@@ -12,11 +12,7 @@ export default function ImageCarousel({ images, alt, className = '' }: ImageCaro
   const [failedImages, setFailedImages] = useState<Set<number>>(new Set());
 
   if (images.length === 0) {
-    return (
-      <div className={`bg-gray-100 flex items-center justify-center ${className}`}>
-        <ImageOff className="w-10 h-10 text-gray-300" />
-      </div>
-    );
+    return <div className={`bg-gray-100 ${className}`} />;
   }
 
   const prev = () => setIndex((i) => (i === 0 ? images.length - 1 : i - 1));
@@ -25,9 +21,7 @@ export default function ImageCarousel({ images, alt, className = '' }: ImageCaro
   return (
     <div className={`relative group overflow-hidden bg-gray-100 ${className}`}>
       {failedImages.has(index) ? (
-        <div className="w-full h-full flex items-center justify-center">
-          <ImageOff className="w-10 h-10 text-gray-300" />
-        </div>
+        <div className="w-full h-full" />
       ) : (
         <img
           src={images[index]}
